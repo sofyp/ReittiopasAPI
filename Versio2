@@ -1,0 +1,49 @@
+'use strict';
+const querydata =`
+{
+  stopsByRadius(lat: 60.1707334, lon: 24.9414158, radius: 1100) {
+    edges {
+      node {
+        distance
+        stop {
+          name
+        }
+      }
+    }
+  }
+}
+`;
+let speedWalk       = 1.4;         // Walking speed in m/s
+
+document.addEventListener('DOMContentLoaded', (evt) => {
+  fetch('https://api.digitransit.fi/routing/v1/routers/hsl/index/graphql', {
+    method: 'POST',
+    headers: {'Content-Type' : 'application/graphql'},
+    body: querydata
+  })
+  .then(vastaus => vastaus.json())
+  .then((json) => {console.log(json); renderData(json)})
+  .catch(error => console.log(error));
+});
+
+const renderData = (data) => {
+  let lines = [];
+  let busStop, distance, name ='';
+  for(let e =0; e< data.stopsByRadius.edges.length-1; e++) {
+    busStop = data.stopsByRadius.edges[e].node;
+    distance = busStop.distance;
+    name = busStop.stop.name;
+    for (let f=0; f< busStop.stop.length; f++) {
+      let oneLine = [];
+      oneLine.distance = distance;
+      oneLine.name = name;
+      oneLine.walkingTime = oneLine.distance/speedWalk*1000;
+
+      if (lines.findIndex(x => x.id === oneLine.id)>=0) {break;} //same line, brake the loop
+      if (oneLine.timeUntil<0) {break;} //you will not make it on time to the bus stop, break the loop (NB: real time!)
+      lines.push(oneLine);
+    }
+  }
+  lines.sort((a, b) => a.scheduleArrival - b.scheduleArrival);
+  showData(lines);
+};
